@@ -1,98 +1,268 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Task Management API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A NestJS REST API for user authentication, profile management, and project CRUD. Built with clean architecture layers (domain, application, infrastructure, presentation), PostgreSQL via Prisma, and Redis caching for project reads.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Tech stack
 
-## Description
+- **Runtime:** Node.js, TypeScript, NestJS 11
+- **Database:** PostgreSQL 16 (Prisma ORM)
+- **Cache:** Redis 7 (project detail caching)
+- **Auth:** JWT access + refresh tokens, bcrypt password hashing
+- **Validation:** class-validator / class-transformer
+- **Rate limiting:** @nestjs/throttler
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Prerequisites
 
-## Project setup
+- Node.js 18+
+- Docker & Docker Compose (recommended), or local PostgreSQL and Redis
+- npm
+
+## Getting started
+
+### 1. Install dependencies
 
 ```bash
-$ npm install
+npm install
 ```
 
-## Compile and run the project
+### 2. Environment variables
+
+Copy the example file and adjust values as needed:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+cp .env.example .env
 ```
 
-## Run tests
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | — |
+| `JWT_ACCESS_SECRET` | Secret for access tokens | — |
+| `JWT_ACCESS_EXPIRES_IN` | Access token TTL | `15m` |
+| `JWT_REFRESH_SECRET` | Secret for refresh tokens | — |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token TTL | `7d` |
+| `BCRYPT_SALT_ROUNDS` | bcrypt cost factor | `12` |
+| `REDIS_HOST` | Redis host | `localhost` |
+| `REDIS_PORT` | Redis port | `6379` |
+| `PORT` | HTTP port | `3000` |
+| `THROTTLE_TTL` | Rate-limit window (seconds) | `60` |
+| `THROTTLE_LIMIT` | Max requests per window | `100` |
+
+### 3. Start infrastructure
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+docker compose up -d postgres redis
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Or start the full stack (app + database + Redis):
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+docker compose up -d
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 4. Run database migrations
 
-## Resources
+```bash
+npm run prisma:migrate:dev
+npm run prisma:generate
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+### 5. Run the API
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```bash
+# development (watch mode)
+npm run start:dev
 
-## Support
+# production build
+npm run build
+npm run start:prod
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+The server listens on `http://localhost:3000` by default.
 
-## Stay in touch
+## API reference
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+All JSON endpoints accept and return `application/json` unless noted. Protected routes require:
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Health
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/` | No | Health check — returns `Hello World!` |
+
+### Auth
+
+Auth routes are throttled to **5 requests / 60 seconds**.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/auth/register` | No | Create a user account |
+| `POST` | `/auth/login` | No | Login — returns access + refresh tokens and user profile |
+| `POST` | `/auth/refresh` | No | Rotate tokens using a refresh token |
+| `POST` | `/auth/logout` | Yes | Revoke refresh token (`204 No Content`) |
+| `GET` | `/auth/me` | Yes | Get current user profile |
+
+**Register / login body**
+
+```json
+{
+  "name": "Jane Doe",
+  "email": "jane@example.com",
+  "password": "Password123!"
+}
+```
+
+Login omits `name`. Password must be at least 8 characters; name at least 2.
+
+**Login response**
+
+```json
+{
+  "accessToken": "<jwt>",
+  "refreshToken": "<jwt>",
+  "user": {
+    "id": "uuid",
+    "name": "Jane Doe",
+    "email": "jane@example.com",
+    "role": "USER",
+    "createdAt": "2026-06-13T10:00:00.000Z",
+    "updatedAt": "2026-06-13T10:00:00.000Z"
+  }
+}
+```
+
+**Refresh / logout body**
+
+```json
+{
+  "refreshToken": "<jwt>"
+}
+```
+
+### Users
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `PATCH` | `/users/me` | Yes | Update current user's name and/or password |
+
+**Body** (all fields optional)
+
+```json
+{
+  "name": "Jane Smith",
+  "password": "NewPassword123!"
+}
+```
+
+Returns the updated user profile (same shape as `/auth/me`).
+
+### Projects
+
+All project routes require authentication. Regular users can only access their own projects; `ADMIN` users can list and access any project.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/projects` | Yes | Create a project |
+| `GET` | `/projects` | Yes | List projects (owned, or all if admin) |
+| `GET` | `/projects/:id` | Yes | Get a project by ID |
+| `PATCH` | `/projects/:id` | Yes | Update a project |
+| `DELETE` | `/projects/:id` | Yes | Delete a project (`204 No Content`) |
+
+**Create body**
+
+```json
+{
+  "name": "My Project",
+  "description": "Optional description"
+}
+```
+
+**Update body** (all fields optional)
+
+```json
+{
+  "name": "Renamed Project",
+  "description": "Updated description"
+}
+```
+
+**Project response**
+
+```json
+{
+  "id": "uuid",
+  "name": "My Project",
+  "description": "Optional description",
+  "ownerId": "uuid",
+  "createdAt": "2026-06-13T10:00:00.000Z",
+  "updatedAt": "2026-06-13T10:00:00.000Z"
+}
+```
+
+Project detail reads are cached in Redis for 5 minutes per owner/project pair.
+
+## Postman collection
+
+Import the collection to exercise every endpoint with pre-configured variables and test scripts:
+
+```
+postman/task-management-api.postman_collection.json
+```
+
+**Suggested flow**
+
+1. **Register** → **Login** (tokens saved automatically)
+2. **Get Current User** or **Update Profile**
+3. **Create Project** → **List Projects** → **Get Project** → **Update Project**
+4. **Refresh Token** when the access token expires
+5. **Logout** when done
+
+Collection variables: `baseUrl`, `accessToken`, `refreshToken`, `userId`, `projectId`, and sample user credentials.
+
+## Project structure
+
+```
+src/
+├── domain/           # Entities, enums, repository interfaces
+├── application/      # Use cases (auth, users, projects services)
+├── infrastructure/   # Prisma, Redis, bcrypt implementations
+└── presentation/     # Controllers, DTOs, guards, decorators
+prisma/
+└── schema.prisma     # Database schema
+postman/              # Postman collection
+```
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run start:dev` | Start in watch mode |
+| `npm run build` | Compile TypeScript |
+| `npm run start:prod` | Run compiled app |
+| `npm run prisma:migrate:dev` | Apply migrations (dev) |
+| `npm run prisma:migrate:deploy` | Apply migrations (prod) |
+| `npm run prisma:generate` | Regenerate Prisma client |
+| `npm run test` | Unit tests |
+| `npm run test:e2e` | End-to-end tests |
+| `npm run lint` | ESLint |
+
+## Error responses
+
+Validation and business errors follow the standard NestJS format:
+
+```json
+{
+  "statusCode": 400,
+  "message": ["email must be an email"],
+  "error": "Bad Request"
+}
+```
+
+Common status codes: `400` validation, `401` unauthorized, `404` not found, `409` conflict (duplicate email), `429` rate limit exceeded.
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED — private project.

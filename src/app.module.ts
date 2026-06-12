@@ -5,6 +5,8 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './application/auth/auth.module';
+import { ProjectsModule } from './application/projects/projects.module';
+import { UsersModule } from './application/users/users.module';
 import { InfrastructureModule } from './infrastructure/infrastructure.module';
 
 @Module({
@@ -24,6 +26,8 @@ import { InfrastructureModule } from './infrastructure/infrastructure.module';
     }),
     InfrastructureModule,
     AuthModule,
+    UsersModule,
+    ProjectsModule,
   ],
   controllers: [AppController],
   providers: [
