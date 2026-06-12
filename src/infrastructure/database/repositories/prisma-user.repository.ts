@@ -4,6 +4,7 @@ import { User } from '../../../domain/entities/user.entity';
 import { Role } from '../../../domain/enums/role.enum';
 import {
   CreateUserData,
+  UpdateUserData,
   UserRepository,
 } from '../../../domain/repositories/user.repository';
 import { PrismaService } from '../prisma/prisma.service';
@@ -34,6 +35,21 @@ export class PrismaUserRepository implements UserRepository {
     });
 
     return user ? this.toDomain(user) : null;
+  }
+
+  async update(id: string, data: UpdateUserData): Promise<User | null> {
+    const existingUser = await this.findById(id);
+
+    if (!existingUser) {
+      return null;
+    }
+
+    const user = await this.prisma.user.update({
+      where: { id },
+      data,
+    });
+
+    return this.toDomain(user);
   }
 
   private toDomain(user: PrismaUser): User {
