@@ -1,7 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { RedisService } from './cache/redis.service';
 import { PrismaModule } from './database/prisma/prisma.module';
-import { PrismaService } from './database/prisma/prisma.service';
 import { PrismaProjectRepository } from './database/repositories/prisma-project.repository';
 import { PrismaRefreshTokenRepository } from './database/repositories/prisma-refresh-token.repository';
 import { PrismaTaskRepository } from './database/repositories/prisma-task.repository';
@@ -46,7 +45,6 @@ import { PASSWORD_HASHER } from '../domain/security/password-hasher.interface';
   ],
   exports: [
     PrismaModule,
-    PrismaService,
     RedisService,
     PasswordHasherService,
     PASSWORD_HASHER,
