@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "name": "Task Management API",
-    "description": "Postman collection for the Task Management API (NestJS).\n\n## Setup\n1. Import this collection into Postman.\n2. Ensure the API is running (`npm run start:dev`) and PostgreSQL/Redis are up.\n3. Default `baseUrl` is `http://localhost:3000` (matches `PORT` in `.env`).\n\n## Auth flow\n1. **Register** — create a user account.\n2. **Login** — saves `accessToken` and `refreshToken` to collection variables automatically.\n3. Use **Get Current User**, **Logout**, or other protected routes (Bearer token is applied at collection level).\n4. **Refresh Token** — rotate tokens when the access token expires (15m by default).\n\n## Rate limits\n- Global: 100 requests / 60s\n- Auth routes (`/auth/*`): 5 requests / 60s",
+    "description": "Postman collection for the Task Management API (NestJS).\n\n## Setup\n1. Import this collection into Postman.\n2. Ensure the API is running (`npm run start:dev`) and PostgreSQL/Redis are up.\n3. Default `baseUrl` is `http://localhost:3000` (matches `PORT` in `.env`).\n\n## Suggested flow\n1. **Register** → **Login** (tokens saved automatically)\n2. **Get Current User** or **Update Profile**\n3. **Create Project** → **List Projects** → **Get Project** → **Update Project**\n4. **Refresh Token** when the access token expires (15m default)\n5. **Logout** when done\n\n## Rate limits\n- Global: 100 requests / 60s\n- Auth routes (`/auth/*`): 5 requests / 60s\n\n## Authorization\n- Collection-level Bearer auth uses `{{accessToken}}`\n- `USER` role: own projects only\n- `ADMIN` role: all projects",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -49,6 +49,11 @@
     {
       "key": "userName",
       "value": "Jane Doe",
+      "type": "string"
+    },
+    {
+      "key": "projectId",
+      "value": "",
       "type": "string"
     }
   ],
@@ -671,6 +676,490 @@
                   "if (pm.response.code === 204) {",
                   "    pm.collectionVariables.set('accessToken', '');",
                   "    pm.collectionVariables.set('refreshToken', '');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "Authenticated user profile management.",
+      "item": [
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Smith\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me"]
+            },
+            "description": "Update the authenticated user's profile.\n\n**Requires:** Bearer access token\n\n### Body (all fields optional)\n| Field | Type | Rules |\n|-------|------|-------|\n| `name` | string | min 2 chars |\n| `password` | string | min 8 chars |\n\n### Responses\n- `200 OK` — updated user profile\n- `401 Unauthorized` — missing or invalid token\n- `404 Not Found` — user not found"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Jane Smith\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/users/me",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users", "me"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"name\": \"Jane Smith\",\n  \"email\": \"jane.doe@example.com\",\n  \"role\": \"USER\",\n  \"createdAt\": \"2026-06-13T10:00:00.000Z\",\n  \"updatedAt\": \"2026-06-13T11:00:00.000Z\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.test('Updated profile returned', function () {",
+                  "        pm.expect(body).to.have.property('name');",
+                  "        pm.expect(body).to.not.have.property('passwordHash');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Projects",
+      "description": "Project CRUD. All routes require authentication.\n\n- **USER** — own projects only\n- **ADMIN** — all projects",
+      "item": [
+        {
+          "name": "Create Project",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My First Project\",\n  \"description\": \"A sample project for testing\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects"]
+            },
+            "description": "Create a new project owned by the authenticated user.\n\n### Body\n| Field | Type | Rules |\n|-------|------|-------|\n| `name` | string | required, non-empty |\n| `description` | string | optional |\n\n### Responses\n- `201 Created` — project object\n- `401 Unauthorized` — missing or invalid token"
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"My First Project\",\n  \"description\": \"A sample project for testing\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/projects",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["projects"]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"id\": \"660e8400-e29b-41d4-a716-446655440001\",\n  \"name\": \"My First Project\",\n  \"description\": \"A sample project for testing\",\n  \"ownerId\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"createdAt\": \"2026-06-13T10:00:00.000Z\",\n  \"updatedAt\": \"2026-06-13T10:00:00.000Z\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('projectId', body.id);",
+                  "",
+                  "    pm.test('Project created', function () {",
+                  "        pm.expect(body).to.have.property('id');",
+                  "        pm.expect(body).to.have.property('name');",
+                  "        pm.expect(body).to.have.property('ownerId');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Projects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects"]
+            },
+            "description": "List projects for the authenticated user. Admins receive all projects.\n\n### Responses\n- `200 OK` — array of projects\n- `401 Unauthorized` — missing or invalid token"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/projects",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["projects"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "[\n  {\n    \"id\": \"660e8400-e29b-41d4-a716-446655440001\",\n    \"name\": \"My First Project\",\n    \"description\": \"A sample project for testing\",\n    \"ownerId\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"createdAt\": \"2026-06-13T10:00:00.000Z\",\n    \"updatedAt\": \"2026-06-13T10:00:00.000Z\"\n  }\n]"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.test('Response is an array', function () {",
+                  "        pm.expect(body).to.be.an('array');",
+                  "    });",
+                  "    if (body.length > 0 && !pm.collectionVariables.get('projectId')) {",
+                  "        pm.collectionVariables.set('projectId', body[0].id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Project",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects", "{{projectId}}"]
+            },
+            "description": "Get a single project by ID. Returns 404 if the project does not exist or is not accessible.\n\nProject details are cached in Redis for 5 minutes.\n\n### Responses\n- `200 OK` — project object\n- `401 Unauthorized` — missing or invalid token\n- `404 Not Found` — project not found"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/projects/{{projectId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["projects", "{{projectId}}"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"id\": \"660e8400-e29b-41d4-a716-446655440001\",\n  \"name\": \"My First Project\",\n  \"description\": \"A sample project for testing\",\n  \"ownerId\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"createdAt\": \"2026-06-13T10:00:00.000Z\",\n  \"updatedAt\": \"2026-06-13T10:00:00.000Z\"\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/projects/00000000-0000-0000-0000-000000000000",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["projects", "00000000-0000-0000-0000-000000000000"]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Project not found\",\n  \"error\": \"Not Found\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Project returned', function () {",
+                  "        pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('projectId'));",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Project",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Renamed Project\",\n  \"description\": \"Updated description\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects", "{{projectId}}"]
+            },
+            "description": "Update a project by ID.\n\n### Body (all fields optional)\n| Field | Type | Rules |\n|-------|------|-------|\n| `name` | string | non-empty if provided |\n| `description` | string | optional |\n\n### Responses\n- `200 OK` — updated project\n- `401 Unauthorized` — missing or invalid token\n- `404 Not Found` — project not found"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Renamed Project\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/projects/{{projectId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["projects", "{{projectId}}"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"id\": \"660e8400-e29b-41d4-a716-446655440001\",\n  \"name\": \"Renamed Project\",\n  \"description\": \"Updated description\",\n  \"ownerId\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"createdAt\": \"2026-06-13T10:00:00.000Z\",\n  \"updatedAt\": \"2026-06-13T11:00:00.000Z\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Project",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects", "{{projectId}}"]
+            },
+            "description": "Delete a project by ID.\n\n### Responses\n- `204 No Content` — deleted successfully\n- `401 Unauthorized` — missing or invalid token\n- `404 Not Found` — project not found"
+          },
+          "response": [
+            {
+              "name": "204 No Content",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/projects/{{projectId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["projects", "{{projectId}}"]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "_postman_previewlanguage": "plain",
+              "header": [],
+              "body": ""
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 204) {",
+                  "    pm.collectionVariables.set('projectId', '');",
                   "}"
                 ]
               }

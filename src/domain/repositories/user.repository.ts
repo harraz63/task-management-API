@@ -10,8 +10,14 @@ export type CreateUserData = {
   role?: Role;
 };
 
+export type UpdateUserData = {
+  name?: string;
+  passwordHash?: string;
+};
+
 export interface UserRepository {
   create(data: CreateUserData): Promise<User>;
   findById(id: string): Promise<User | null>;
   findByEmail(email: string): Promise<User | null>;
+  update(id: string, data: UpdateUserData): Promise<User | null>;
 }
