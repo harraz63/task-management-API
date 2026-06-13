@@ -41,6 +41,25 @@ export class PrismaTaskRepository implements TaskRepository {
     return task ? this.toDomain(task) : null;
   }
 
+  async findMany(): Promise<Task[]> {
+    const tasks = await this.prisma.task.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return tasks.map((task) => this.toDomain(task));
+  }
+
+  async findManyForOwner(ownerId: string): Promise<Task[]> {
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        project: { ownerId },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return tasks.map((task) => this.toDomain(task));
+  }
+
   async findManyByProjectForOwner(
     projectId: string,
     ownerId: string,
@@ -54,6 +73,21 @@ export class PrismaTaskRepository implements TaskRepository {
     });
 
     return tasks.map((task) => this.toDomain(task));
+  }
+
+  async update(id: string, data: UpdateTaskData): Promise<Task | null> {
+    const task = await this.findById(id);
+
+    if (!task) {
+      return null;
+    }
+
+    const updatedTask = await this.prisma.task.update({
+      where: { id },
+      data,
+    });
+
+    return this.toDomain(updatedTask);
   }
 
   async updateForOwner(
@@ -73,6 +107,20 @@ export class PrismaTaskRepository implements TaskRepository {
     });
 
     return this.toDomain(updatedTask);
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const task = await this.findById(id);
+
+    if (!task) {
+      return false;
+    }
+
+    await this.prisma.task.delete({
+      where: { id },
+    });
+
+    return true;
   }
 
   async deleteForOwner(id: string, ownerId: string): Promise<boolean> {

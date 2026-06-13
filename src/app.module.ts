@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './application/auth/auth.module';
 import { ProjectsModule } from './application/projects/projects.module';
+import { TasksModule } from './application/tasks/tasks.module';
 import { UsersModule } from './application/users/users.module';
 import { InfrastructureModule } from './infrastructure/infrastructure.module';
 
@@ -28,6 +29,7 @@ import { InfrastructureModule } from './infrastructure/infrastructure.module';
     AuthModule,
     UsersModule,
     ProjectsModule,
+    TasksModule,
   ],
   controllers: [AppController],
   providers: [
