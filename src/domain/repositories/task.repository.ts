@@ -25,11 +25,18 @@ export interface TaskRepository {
   create(data: CreateTaskData): Promise<Task>;
   findById(id: string): Promise<Task | null>;
   findByIdForOwner(id: string, ownerId: string): Promise<Task | null>;
-  findManyByProjectForOwner(projectId: string, ownerId: string): Promise<Task[]>;
+  findMany(): Promise<Task[]>;
+  findManyForOwner(ownerId: string): Promise<Task[]>;
+  findManyByProjectForOwner(
+    projectId: string,
+    ownerId: string,
+  ): Promise<Task[]>;
+  update(id: string, data: UpdateTaskData): Promise<Task | null>;
   updateForOwner(
     id: string,
     ownerId: string,
     data: UpdateTaskData,
   ): Promise<Task | null>;
+  delete(id: string): Promise<boolean>;
   deleteForOwner(id: string, ownerId: string): Promise<boolean>;
 }
