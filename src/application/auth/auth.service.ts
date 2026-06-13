@@ -63,10 +63,11 @@ export class AuthService {
       name: dto.name,
       email: dto.email,
       passwordHash,
-      // Registration never grants ADMIN. For testing, change role manually with `npx prisma studio`.
+      // Registration never be an ADMIN
       role: Role.USER,
     });
 
+    // Return the user profile without the hashed password
     return toUserProfile(user);
   }
 
@@ -150,6 +151,7 @@ export class AuthService {
       expiresIn: this.getJwtExpiresIn('JWT_ACCESS_EXPIRES_IN', '15m'),
     });
 
+    // get the refresh token expiration time
     const refreshExpiresIn = this.getJwtExpiresIn(
       'JWT_REFRESH_EXPIRES_IN',
       '7d',
