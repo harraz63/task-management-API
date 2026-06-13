@@ -1,268 +1,205 @@
 # Task Management API
 
-A NestJS REST API for user authentication, profile management, and project CRUD. Built with clean architecture layers (domain, application, infrastructure, presentation), PostgreSQL via Prisma, and Redis caching for project reads.
+A NestJS REST API for user authentication, project management, and task management. The codebase follows a layered architecture: domain models and repository contracts live away from framework and database details, application services hold use cases, Prisma and Redis live in infrastructure, and HTTP controllers/guards/DTOs live in presentation.
 
 ## Tech stack
 
-- **Runtime:** Node.js, TypeScript, NestJS 11
-- **Database:** PostgreSQL 16 (Prisma ORM)
-- **Cache:** Redis 7 (project detail caching)
-- **Auth:** JWT access + refresh tokens, bcrypt password hashing
-- **Validation:** class-validator / class-transformer
-- **Rate limiting:** @nestjs/throttler
+- Node.js, TypeScript, NestJS 11
+- PostgreSQL 16 with Prisma ORM
+- Redis 7 with `ioredis`
+- JWT access and refresh tokens
+- bcrypt password hashing
+- class-validator/class-transformer request validation
+- Swagger/OpenAPI docs
+- Jest and Supertest for tests
+- Docker Compose for local infrastructure and full-stack runs
 
-## Prerequisites
+## Run with Docker
 
-- Node.js 18+
-- Docker & Docker Compose (recommended), or local PostgreSQL and Redis
-- npm
-
-## Getting started
-
-### 1. Install dependencies
-
-```bash
-npm install
-```
-
-### 2. Environment variables
-
-Copy the example file and adjust values as needed:
+Create a `.env` file first:
 
 ```bash
 cp .env.example .env
 ```
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | — |
-| `JWT_ACCESS_SECRET` | Secret for access tokens | — |
-| `JWT_ACCESS_EXPIRES_IN` | Access token TTL | `15m` |
-| `JWT_REFRESH_SECRET` | Secret for refresh tokens | — |
-| `JWT_REFRESH_EXPIRES_IN` | Refresh token TTL | `7d` |
-| `BCRYPT_SALT_ROUNDS` | bcrypt cost factor | `12` |
+Then start the full stack with one command:
+
+```bash
+docker compose up --build
+```
+
+The API will be available at `http://localhost:3000`. Swagger docs are available at `http://localhost:3000/api/docs`.
+
+The Docker image runs `npx prisma migrate deploy` before starting the compiled NestJS app, so committed migrations are applied automatically for Docker/production-style runs.
+
+## Run locally without Docker
+
+You need local PostgreSQL and Redis running, then:
+
+```bash
+cp .env.example .env
+npm install
+npx prisma migrate dev
+npm run start:dev
+```
+
+The default `.env.example` values target local services on `localhost:5432` and `localhost:6379`. Adjust `DATABASE_URL`, `REDIS_HOST`, and `REDIS_PORT` if your local services use different credentials, hosts, or ports.
+
+## Environment variables
+
+All required and optional runtime variables are listed in `.env.example` with safe placeholder values.
+
+| Variable | Description | Example |
+| --- | --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string used by Prisma | `postgresql://postgres:postgres@localhost:5432/junior_assessment?schema=public` |
+| `JWT_ACCESS_SECRET` | Secret used to sign access tokens | `replace-with-access-secret` |
+| `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `15m` |
+| `JWT_REFRESH_SECRET` | Secret used to sign refresh tokens | `replace-with-refresh-secret` |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime | `7d` |
+| `BCRYPT_SALT_ROUNDS` | bcrypt cost factor for password hashing | `12` |
 | `REDIS_HOST` | Redis host | `localhost` |
 | `REDIS_PORT` | Redis port | `6379` |
-| `PORT` | HTTP port | `3000` |
-| `THROTTLE_TTL` | Rate-limit window (seconds) | `60` |
-| `THROTTLE_LIMIT` | Max requests per window | `100` |
+| `PORT` | HTTP server port | `3000` |
+| `THROTTLE_TTL` | Global rate-limit window in seconds | `60` |
+| `THROTTLE_LIMIT` | Global request limit per window | `100` |
 
-### 3. Start infrastructure
+## Database migrations
 
-```bash
-docker compose up -d postgres redis
-```
-
-Or start the full stack (app + database + Redis):
+Use Prisma migrations in development:
 
 ```bash
-docker compose up -d
+npx prisma migrate dev
 ```
 
-### 4. Run database migrations
+Use deploy mode for Docker and production environments:
 
 ```bash
-npm run prisma:migrate:dev
-npm run prisma:generate
+npx prisma migrate deploy
 ```
 
-### 5. Run the API
+The Dockerfile already wires `npx prisma migrate deploy` into container startup.
+
+## Architecture
+
+The source is split into four main layers:
+
+- `src/domain`: entities, enums, and repository interfaces. This layer has the business vocabulary and does not know about NestJS, Prisma, Redis, or HTTP.
+- `src/application`: use-case services for auth, users, projects, and tasks. These services depend on domain repository interfaces.
+- `src/infrastructure`: concrete implementations for Prisma repositories, Redis caching, and bcrypt hashing.
+- `src/presentation`: controllers, DTOs, guards, decorators, filters, and middleware.
+
+Prisma sits behind repository interfaces such as `UserRepository`, `ProjectRepository`, `TaskRepository`, and `RefreshTokenRepository`. That keeps business logic decoupled from the ORM, makes application services easier to test, and lets infrastructure details change without rewriting the domain/application layers.
+
+Prisma was chosen because it provides a type-safe generated client, schema-first migrations, and a simple developer experience. The repository pattern keeps those benefits while still meeting the layered-architecture requirement.
+
+## Auth and authorization
+
+Users register with `POST /auth/register` and log in with `POST /auth/login`. Registration always creates a `USER` account.
+
+Login returns:
+
+- an access token for authenticated API requests;
+- a refresh token for requesting a new token pair;
+- the authenticated user profile.
+
+Refresh tokens are stored as SHA-256 hashes and rotate on `POST /auth/refresh`: the used refresh token is revoked and a new access/refresh pair is issued. `POST /auth/logout` revokes the provided refresh token for the current user.
+
+Protected routes use the JWT guard. Role-based routes use the roles guard/decorator infrastructure. Project and task access also performs ownership checks in the application services. When a user requests another user's project or task, the API returns `404 Not Found` instead of `403 Forbidden` so resource existence is not leaked.
+
+To test the `ADMIN` role manually, register a normal user, then run Prisma Studio:
 
 ```bash
-# development (watch mode)
-npm run start:dev
-
-# production build
-npm run build
-npm run start:prod
+npx prisma studio
 ```
 
-The server listens on `http://localhost:3000` by default.
+Open the `User` table and change that user's `role` from `USER` to `ADMIN`.
 
-## API reference
+## Redis caching
 
-All JSON endpoints accept and return `application/json` unless noted. Protected routes require:
+Project detail reads are cached for regular users and admins after `GET /projects/:id`.
 
-```
+- Cache key format: `project:{ownerId}:{projectId}`
+- TTL: 300 seconds
+- Cached data: the serialized project detail response
+- Invalidation: `PATCH /projects/:id` and `DELETE /projects/:id` delete the matching project cache key
+
+Redis is intentionally best-effort. If Redis is down or a cache operation fails, the API logs a warning and continues with the database path.
+
+## API overview
+
+Swagger docs are available at `/api/docs` once the API is running.
+
+Common protected-route header:
+
+```http
 Authorization: Bearer <accessToken>
 ```
 
-### Health
+Core endpoints:
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/` | No | Health check — returns `Hello World!` |
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/` | Health check |
+| `POST` | `/auth/register` | Register a user |
+| `POST` | `/auth/login` | Log in and receive tokens |
+| `POST` | `/auth/refresh` | Rotate refresh token and receive a new token pair |
+| `POST` | `/auth/logout` | Revoke a refresh token |
+| `GET` | `/auth/me` | Get current user profile |
+| `PATCH` | `/users/me` | Update current user's profile |
+| `POST` | `/projects` | Create a project |
+| `GET` | `/projects` | List visible projects |
+| `GET` | `/projects/:id` | Get one visible project |
+| `PATCH` | `/projects/:id` | Update one owned/visible project |
+| `DELETE` | `/projects/:id` | Delete one owned/visible project |
+| `POST` | `/tasks` | Create a task in an owned/visible project |
+| `GET` | `/tasks` | List visible tasks |
+| `GET` | `/tasks/:id` | Get one visible task |
+| `PATCH` | `/tasks/:id` | Update one visible task |
+| `DELETE` | `/tasks/:id` | Delete one visible task |
 
-### Auth
+## Manual test flow
 
-Auth routes are throttled to **5 requests / 60 seconds**.
+1. Register a user with `POST /auth/register`.
+2. Log in with `POST /auth/login` and copy the returned `accessToken`.
+3. Create a project with `POST /projects`.
+4. Create a task with `POST /tasks` using the returned project ID.
+5. Call `GET /projects/:id` twice. The first call fills Redis, and the second call should be served from the cached `project:{ownerId}:{projectId}` entry when Redis is available.
+6. Update the project with `PATCH /projects/:id`. This invalidates the project cache key.
+7. Call `GET /projects/:id` again to repopulate the cache with updated data.
+8. Register and log in as a second user.
+9. Confirm the second user receives `404 Not Found` when trying to access the first user's project or task.
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `POST` | `/auth/register` | No | Create a user account |
-| `POST` | `/auth/login` | No | Login — returns access + refresh tokens and user profile |
-| `POST` | `/auth/refresh` | No | Rotate tokens using a refresh token |
-| `POST` | `/auth/logout` | Yes | Revoke refresh token (`204 No Content`) |
-| `GET` | `/auth/me` | Yes | Get current user profile |
+## Tests
 
-**Register / login body**
-
-```json
-{
-  "name": "Jane Doe",
-  "email": "jane@example.com",
-  "password": "Password123!"
-}
+```bash
+npm run test
+npm run test:e2e
 ```
 
-Login omits `name`. Password must be at least 8 characters; name at least 2.
+The e2e test expects `DATABASE_URL` to point at a reachable PostgreSQL database with migrations applied. Redis is optional for the test because cache failures degrade gracefully.
 
-**Login response**
+## Useful scripts
 
-```json
-{
-  "accessToken": "<jwt>",
-  "refreshToken": "<jwt>",
-  "user": {
-    "id": "uuid",
-    "name": "Jane Doe",
-    "email": "jane@example.com",
-    "role": "USER",
-    "createdAt": "2026-06-13T10:00:00.000Z",
-    "updatedAt": "2026-06-13T10:00:00.000Z"
-  }
-}
-```
+| Command | Description |
+| --- | --- |
+| `npm run start:dev` | Start the API in watch mode |
+| `npm run build` | Compile TypeScript |
+| `npm run start:prod` | Run the compiled app |
+| `npm run prisma:generate` | Generate Prisma client |
+| `npm run prisma:migrate:dev` | Run development migrations |
+| `npm run prisma:migrate:deploy` | Apply committed migrations |
+| `npm run test` | Run unit tests |
+| `npm run test:e2e` | Run e2e tests |
+| `npm run lint` | Run ESLint with fixes |
 
-**Refresh / logout body**
+## Postman
 
-```json
-{
-  "refreshToken": "<jwt>"
-}
-```
+A Postman collection is included at:
 
-### Users
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `PATCH` | `/users/me` | Yes | Update current user's name and/or password |
-
-**Body** (all fields optional)
-
-```json
-{
-  "name": "Jane Smith",
-  "password": "NewPassword123!"
-}
-```
-
-Returns the updated user profile (same shape as `/auth/me`).
-
-### Projects
-
-All project routes require authentication. Regular users can only access their own projects; `ADMIN` users can list and access any project.
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `POST` | `/projects` | Yes | Create a project |
-| `GET` | `/projects` | Yes | List projects (owned, or all if admin) |
-| `GET` | `/projects/:id` | Yes | Get a project by ID |
-| `PATCH` | `/projects/:id` | Yes | Update a project |
-| `DELETE` | `/projects/:id` | Yes | Delete a project (`204 No Content`) |
-
-**Create body**
-
-```json
-{
-  "name": "My Project",
-  "description": "Optional description"
-}
-```
-
-**Update body** (all fields optional)
-
-```json
-{
-  "name": "Renamed Project",
-  "description": "Updated description"
-}
-```
-
-**Project response**
-
-```json
-{
-  "id": "uuid",
-  "name": "My Project",
-  "description": "Optional description",
-  "ownerId": "uuid",
-  "createdAt": "2026-06-13T10:00:00.000Z",
-  "updatedAt": "2026-06-13T10:00:00.000Z"
-}
-```
-
-Project detail reads are cached in Redis for 5 minutes per owner/project pair.
-
-## Postman collection
-
-Import the collection to exercise every endpoint with pre-configured variables and test scripts:
-
-```
+```text
 postman/task-management-api.postman_collection.json
 ```
 
-**Suggested flow**
-
-1. **Register** → **Login** (tokens saved automatically)
-2. **Get Current User** or **Update Profile**
-3. **Create Project** → **List Projects** → **Get Project** → **Update Project**
-4. **Refresh Token** when the access token expires
-5. **Logout** when done
-
-Collection variables: `baseUrl`, `accessToken`, `refreshToken`, `userId`, `projectId`, and sample user credentials.
-
-## Project structure
-
-```
-src/
-├── domain/           # Entities, enums, repository interfaces
-├── application/      # Use cases (auth, users, projects services)
-├── infrastructure/   # Prisma, Redis, bcrypt implementations
-└── presentation/     # Controllers, DTOs, guards, decorators
-prisma/
-└── schema.prisma     # Database schema
-postman/              # Postman collection
-```
-
-## Scripts
-
-| Command | Description |
-|---------|-------------|
-| `npm run start:dev` | Start in watch mode |
-| `npm run build` | Compile TypeScript |
-| `npm run start:prod` | Run compiled app |
-| `npm run prisma:migrate:dev` | Apply migrations (dev) |
-| `npm run prisma:migrate:deploy` | Apply migrations (prod) |
-| `npm run prisma:generate` | Regenerate Prisma client |
-| `npm run test` | Unit tests |
-| `npm run test:e2e` | End-to-end tests |
-| `npm run lint` | ESLint |
-
-## Error responses
-
-Validation and business errors follow the standard NestJS format:
-
-```json
-{
-  "statusCode": 400,
-  "message": ["email must be an email"],
-  "error": "Bad Request"
-}
-```
-
-Common status codes: `400` validation, `401` unauthorized, `404` not found, `409` conflict (duplicate email), `429` rate limit exceeded.
-
 ## License
 
-UNLICENSED — private project.
+UNLICENSED - private project.
