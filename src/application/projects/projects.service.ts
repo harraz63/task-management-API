@@ -10,6 +10,7 @@ import type {
 import { RedisService } from '../../infrastructure/cache/redis.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
+// With no user id because i get the user from the token
 type CreateProjectInput = {
   name: string;
   description?: string;
@@ -41,6 +42,7 @@ export class ProjectsService {
   }
 
   findMany(user: AuthenticatedUser): Promise<Project[]> {
+    // Get all projects for admin
     if (user.role === Role.ADMIN) {
       return this.projectRepository.findMany();
     }
@@ -105,6 +107,7 @@ export class ProjectsService {
       this.throwNotFound();
     }
 
+    // delete the cached project after update
     await this.redisService.del(this.cacheKey(project.ownerId, id));
 
     return updatedProject;
@@ -120,6 +123,8 @@ export class ProjectsService {
 
     await this.redisService.del(this.cacheKey(project.ownerId, id));
   }
+
+  // the helpers functions
 
   private async findAccessibleProject(
     id: string,
