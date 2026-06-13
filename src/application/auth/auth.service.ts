@@ -63,6 +63,7 @@ export class AuthService {
       name: dto.name,
       email: dto.email,
       passwordHash,
+      // Registration never grants ADMIN. For testing, change role manually with `npx prisma studio`.
       role: Role.USER,
     });
 
