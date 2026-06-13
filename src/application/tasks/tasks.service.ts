@@ -55,7 +55,7 @@ export class TasksService {
       status: dto.status ?? TaskStatus.TODO,
       priority: dto.priority ?? TaskPriority.MEDIUM,
       projectId: dto.projectId,
-      dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+      dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined, // Convert the due date to a Date object
     };
 
     return this.taskRepository.create(data);

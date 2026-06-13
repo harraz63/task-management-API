@@ -1,5 +1,6 @@
 import { User } from '../../domain/entities/user.entity';
 
+// Create new user type that does not include the hashed password
 export type UserProfile = Omit<User, 'passwordHash'>;
 
 export function toUserProfile(user: User): UserProfile {
