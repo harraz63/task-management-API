@@ -74,9 +74,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
     try {
-      this.client.disconnect();
+      await this.client.quit();
     } catch (error) {
       this.logger.warn(`Redis disconnect failed: ${this.message(error)}`);
     }
