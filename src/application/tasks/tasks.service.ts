@@ -40,10 +40,10 @@ export class TasksService {
   ) {}
 
   async create(dto: CreateTaskInput, user: AuthenticatedUser): Promise<Task> {
-    const project = await this.projectRepository.findByIdForOwner(
-      dto.projectId,
-      user.id,
-    );
+    const project =
+      user.role === Role.ADMIN
+        ? await this.projectRepository.findById(dto.projectId)
+        : await this.projectRepository.findByIdForOwner(dto.projectId, user.id);
 
     if (!project) {
       throw new NotFoundException('Project not found');
