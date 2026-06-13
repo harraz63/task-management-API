@@ -76,6 +76,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         };
       }
 
+      if (exception.code === 'P2003') {
+        return {
+          statusCode: HttpStatus.CONFLICT,
+          message: 'Foreign key constraint failed',
+          error: 'Conflict',
+          timestamp,
+          path,
+        };
+      }
+
       if (exception.code === 'P2025') {
         return {
           statusCode: HttpStatus.NOT_FOUND,
