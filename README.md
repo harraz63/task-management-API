@@ -92,7 +92,6 @@ Prisma sits behind repository interfaces such as `UserRepository`, `ProjectRepos
 
 Prisma was chosen because it provides a type-safe generated client, schema-first migrations, and a simple developer experience. The repository pattern keeps those benefits while still meeting the layered-architecture requirement.
 
-Architecture and request-flow diagrams are available in [docs/architecture.md](docs/architecture.md).
 
 ## Auth and authorization
 
