@@ -21,3 +21,5 @@ lerna-debug.log*
 
 /generated/prisma
 config.bat
+
+.env
